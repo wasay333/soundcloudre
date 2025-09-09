@@ -1,13 +1,33 @@
 import { test, expect, Browser, Page } from '@playwright/test'
-import { chromium } from 'playwright'
+import { chromium } from 'playwright-extra'
 import crypto from 'crypto'
 import dotenv from 'dotenv'
 // Load environment variables
+import stealth from 'puppeteer-extra-plugin-stealth'  // ✅ this is correct
+
 dotenv.config()
 const CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID as string
 const CLIENT_SECRET = process.env.SOUNDCLOUD_CLIENT_SECRET as string
 const REDIRECT_URI = 'http://localhost:3000/callback'
-
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+async function humanLikeInteraction(page: Page) {
+  // Random mouse movement and click
+  await page.mouse.move(
+    Math.floor(Math.random() * 400) + 100, // random between 100-500
+    Math.floor(Math.random() * 400) + 100
+  )
+  await page.mouse.down()
+  await page.mouse.up()
+  
+  // Random scroll
+  await page.evaluate(() => {
+    window.scrollTo(0, Math.random() * document.body.scrollHeight)
+  })
+  
+  // Random sleep between 1-3 seconds
+  const sleepTime = Math.random() * 2000 + 1000 // 1000-3000ms
+  await sleep(sleepTime)
+}
 // PKCE codes
 const generatePKCECodes = () => {
   const codeVerifier = crypto.randomBytes(32).toString('base64url')
@@ -17,11 +37,11 @@ const generatePKCECodes = () => {
 const generateState = () => crypto.randomBytes(16).toString('hex')
 
 test('SoundCloud Authorization Code Flow with Google', async () => {
+  
+  chromium.use(stealth())
   const browser: Browser = await chromium.launch({ headless: false, slowMo: 50 })
   const page: Page = await browser.newPage()
-// Import stealth plugin or define stealth_sync function
 
-// Apply stealth plugin to the browser
 
 
   try {
@@ -29,6 +49,8 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
     const state = generateState()
 
     await page.goto('http://localhost:3000')
+       await humanLikeInteraction(page)
+
     await page.evaluate(({ codeVerifier, state }) => {
       localStorage.setItem('code_verifier', codeVerifier)
       localStorage.setItem('oauth_state', state)
@@ -45,6 +67,8 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
     await page.goto(authUrl.toString())
     console.log('🔗 Visiting:', authUrl.toString())
 
+        await humanLikeInteraction(page)
+
     // Try Google login first
     try {
       const googleButton = page.locator('button.sc-button-google')
@@ -56,6 +80,7 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
       ])
 
       await googlePopup.waitForLoadState('domcontentloaded')
+      await humanLikeInteraction(googlePopup)
 
       const googleEmail = process.env.GOOGLE_EMAIL
       const googlePassword = process.env.GOOGLE_PASSWORD
@@ -63,10 +88,13 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
 
       // Fill email
       await googlePopup.fill('input[type="email"], #identifierId', googleEmail)
+            await sleep(Math.random() * 1000 + 500) // Random delay
+
       await googlePopup.click('#identifierNext, button:has-text("Next")')
 
+      await sleep(Math.random() * 2000 + 1000)
+      await humanLikeInteraction(googlePopup)
       // Wait for password page to load
-
       // Try both name=Passwd and fallback :visible selector
       let passwordField = googlePopup.locator('input[name="Passwd"]:visible')
       if (!(await passwordField.count())) {
@@ -74,6 +102,7 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
       }
 
       await passwordField.fill(googlePassword)
+      await sleep(Math.random() * 1000 + 500) // Random delay
 
       // Click Next after entering password
       const nextButton = googlePopup.getByRole('button', { name: 'Next' })
@@ -88,6 +117,7 @@ test('SoundCloud Authorization Code Flow with Google', async () => {
       
     console.log(e)
     }
+    await humanLikeInteraction(page)
 
     // Handle "Connect" page if it appears
     try {
